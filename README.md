@@ -1,88 +1,219 @@
 # Cloudsmith Webhook Automation
 
-Automation scripts to create and manage Cloudsmith webhooks for package lifecycle events.
+This repository provides automation scripts to create and manage **Cloudsmith webhooks via API** for package lifecycle events.
 
-## Prerequisites
+It covers two primary webhook use cases:
 
-Set environment variables:
+1. **Python Shared Package Webhook**
+   - Triggers when a Python package tagged `shared`:
+     - Is synchronized
+     - Has its tag updated
 
-```bash
-export CLOUDSMITH_API_KEY="your_api_key_here"
-export WEBHOOK_TARGET_URL="https://your-webhook-url"
+2. **Slack Notification for Deleted Latest Releases**
+   - Triggers when an `npm` or `Python` package:
+     - Tagged as the latest release
+     - Is deleted from Cloudsmith
+
+   - Sends a structured notification to Slack
+
+---
+
+# Architecture Overview
+
+```
+Cloudsmith Event
+        ↓
+Cloudsmith Webhook
+        ↓
+Target Endpoint (webhook.site / Slack)
 ```
 
 ---
 
-## Webhook #1: Python Package Sync/Tag Update
+# Prerequisites
 
-### Create
+Before running the scripts, ensure the following:
+
+## 1. Cloudsmith API Key
+
+You must have a Cloudsmith API key with permission to create webhooks in the target namespace and repository.
+
+Set it as an environment variable:
+
+```bash
+export CLOUDSMITH_API_KEY="your_api_key_here"
+```
+
+## 2. Webhook Target URL
+
+Set the target endpoint for webhook payload delivery:
+
+```bash
+export WEBHOOK_TARGET_URL="https://your-webhook-url"
+```
+
+### Target URL Recommendations
+
+| Webhook                   | Recommended Target                             |
+| ------------------------- | ---------------------------------------------- |
+| Webhook #1 (Testing)      | [https://webhook.site/](https://webhook.site/) |
+| Webhook #2 (Slack Alerts) | Slack Incoming Webhook URL                     |
+
+---
+
+# Webhook #1 — Python `shared` Tag Events
+
+## Description
+
+Creates a webhook that triggers when:
+
+- A Python package tagged `shared` is synchronized
+- A tag is updated for that package
+
+## Script
+
+```
+repo_webhook_create.sh
+```
+
+## Usage
 
 ```bash
 chmod +x repo_webhook_create.sh
 ./repo_webhook_create.sh
 ```
 
-Returns webhook ID: `8pVeC65HyPcW`
+## Expected Output
 
-### Test
+The script will:
 
-1. Synchronize a Python package tagged `shared`
-2. OR update the `shared` tag on an existing package
-3. Verify payload arrives at `WEBHOOK_TARGET_URL`
+- Send a `POST` request to the Cloudsmith Webhooks API
+- Configure event filters and message templates
+- Return the webhook `slug_perm`
+
+Example output:
+
+```
+#### Creating a webhook..../...with 'slug_perm' as ####
+"8pVeC65HyPcW"
+```
 
 ---
 
-## Webhook #2: Slack Alert for Deleted Latest Releases
+# Webhook #2 — Slack Alert for Deleted Latest Releases
 
-### Create
+## Description
+
+Creates a webhook that triggers when:
+
+- An `npm` or `Python` package
+- Tagged as the latest release
+- Is deleted
+
+A formatted Slack message will be sent to the configured Slack channel.
+
+## Script
+
+```
+repo_webhook_create_slack.sh
+```
+
+## Usage
 
 ```bash
 chmod +x repo_webhook_create_slack.sh
 ./repo_webhook_create_slack.sh
 ```
 
-Returns webhook ID: `9xYzA12AbCdE`
+## Expected Output
 
-### Test
-
-1. Delete an `npm` or `Python` package tagged as `latest`
-2. Verify Slack channel receives notification
-
----
-
-## Troubleshooting
-
-- **No payload received**: Verify `WEBHOOK_TARGET_URL` and event filter conditions
-- **API returns null**: Delete existing webhook before recreating
-
----
-
-## Security
-
-- Don't commit `CLOUDSMITH_API_KEY`
-- Use secret management for CI/CD
-- Restrict webhook permissions
-
----
-
-## Customization
-
-Modify script templates to adjust Slack formatting, event filters, or integrate other services.
-
-See [Cloudsmith API docs](https://docs.cloudsmith.com/api/webhooks/create) for full options.
-
-## Steps to make incoming webhook target in slack
-
-1. Go to your Slack workspace (personal) and navigate to "Apps" or "Integrations".
-2. Create a new chennel for receiving notifications (optional but recommended) in Slack.
-3. Click on 3 dots in the top right corner of the channel and select edit settings.
-4. Go to "Integrations" tab and click on "Add an App" and search for "Incoming Webhooks".
-5. Click on view and then click on configuration, will take you to the configuration page on the Slack website.
-6. Click on "Add to slack" button and select the channel you want to post notifications to, then click "Add Incoming Webhooks integration".
-7. After adding the integration, you will be provided with a Webhook URL. Copy this URL and set it as the value of `WEBHOOK_TARGET_URL` environment variable in your terminal:
-
-```bash
-export WEBHOOK_TARGET_URL="https://hooks.slack.com/services/your/webhook/url"
+```
+#### Creating a webhook..../...with 'slug_perm' as ####
+"9xYzA12AbCdE"
 ```
 
-8. Now you can run the webhook creation script to set up the webhook with the Slack URL as the target for notifications. When the specified events occur in Cloudsmith, you should see notifications in your Slack channel.
+---
+
+# Testing the Webhooks
+
+## Test Webhook #1
+
+1. Synchronize a Python package tagged `shared`
+   **OR**
+2. Update the `shared` tag on an existing package
+
+Verify that the payload is delivered to the configured endpoint.
+
+---
+
+## Test Webhook #2
+
+1. Delete an `npm` or `Python` package
+2. Ensure it is tagged as the latest release
+
+Verify that the Slack channel receives the notification.
+
+---
+
+# Troubleshooting
+
+### No Payload Received
+
+- Confirm `WEBHOOK_TARGET_URL` is correct
+- Check Cloudsmith webhook configuration
+- Validate that the event filter conditions are met
+
+### API Returns `null`
+
+If recreating a webhook:
+
+- Delete the existing webhook first
+- Then rerun the script
+
+Webhooks can be removed via:
+
+- Cloudsmith UI
+- Cloudsmith API
+
+---
+
+# Security Considerations
+
+- Do not commit your `CLOUDSMITH_API_KEY`
+- Use secure secret management in CI/CD pipelines
+- Restrict webhook permissions to minimum required scope
+
+---
+
+# Customization
+
+The webhook payload templates inside the scripts can be modified to:
+
+- Change Slack formatting
+- Add additional metadata fields
+- Adjust event filters
+- Integrate with other services (e.g., Teams, Datadog, custom APIs)
+
+---
+
+# API Reference
+
+For full webhook configuration options, see:
+
+[https://docs.cloudsmith.com/api/webhooks/create](https://docs.cloudsmith.com/api/webhooks/create)
+
+---
+
+# License
+
+This project is intended for internal automation and integration purposes.
+Adapt as required for your organization’s workflow.
+
+---
+
+If you’d like, I can also provide:
+
+- A version with badges (CI, license, version)
+- A developer-focused README with curl examples inline
+- A Terraform-based alternative
+- Or a version tailored specifically for a Cloudsmith demo environment
